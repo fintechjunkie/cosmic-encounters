@@ -75,7 +75,7 @@ function returnShips(g:Game,p:number,n:number) {
   const places=bases(g,p).sort((a,b)=>(Number(b.home===p&&!b.moon)-Number(a.home===p&&!a.moon)) || a.ships[p]-b.ships[p]);
   if(places.length) places[0].ships[p]+=n; else g.players[p].warp+=n;
 }
-function loseShips(g:Game,p:number,n:number,immortal=hasPower(g,p,'Zombie')) { if(immortal && bases(g,p).length) {returnShips(g,p,n); record(g,`${g.players[p].name} returns ${n} immortal token${n===1?'':'s'} to base.`);} else g.players[p].warp+=n; }
+function loseShips(g:Game,p:number,n:number,immortal=hasPower(g,p,'Zombie')) { if(!n)return;if(immortal && bases(g,p).length) {returnShips(g,p,n); record(g,`${g.players[p].name} invokes Immortality: ${n} token${n===1?' returns':'s return'} to base.`);} else {g.players[p].warp+=n;record(g,`${n} ${g.players[p].name} token${n===1?' falls':'s fall'} into the Warp.`);} }
 function recover(g:Game,p:number,n:number) { const amount=Math.min(n,g.players[p].warp); if(!bases(g,p).length)return 0; g.players[p].warp-=amount; returnShips(g,p,amount); return amount; }
 function draw(g:Game,p:number,n:number) {
   for(let i=0;i<n;i++) {
@@ -226,6 +226,13 @@ function resolveCombat(g:Game) {
     g.phase='deal';return;
   }
   e.totals[o]=oc.kind==='attack'?combatTotal(g,o,oc):0;e.totals[d]=dc.kind==='attack'?combatTotal(g,d,dc):0;
+  for(const p of [o,d])if(powerActive(g,p)){
+    const alien=g.players[p].alien;
+    if(alien==='Macron')record(g,`${g.players[p].name} invokes Mass: every token counts as four.`);
+    if(alien==='Virus')record(g,`${g.players[p].name} invokes Multiplication: card strength multiplies by allied tokens.`);
+    if(alien==='Warpish')record(g,`${g.players[p].name} invokes Necromancy: ${g.players[p].warp} Warp token${g.players[p].warp===1?'':'s'} join the total.`);
+    if(alien==='Anti-Matter')record(g,`${g.players[p].name} invokes Negation: the lower total will win.`);
+  }
   const pacifistO=oc.kind==='compromise'&&dc.kind==='attack'&&hasPower(g,o,'Pacifist');
   const pacifistD=dc.kind==='compromise'&&oc.kind==='attack'&&hasPower(g,d,'Pacifist');
   const reverse=hasPower(g,o,'Anti-Matter')||hasPower(g,d,'Anti-Matter');
@@ -250,8 +257,8 @@ function resolveCombat(g:Game) {
     for(let i=0;i<count;i++){const index=Math.floor(random(g)*g.players[winner].hand.length);g.players[loser].hand.push(g.players[winner].hand.splice(index,1)[0]);}
     record(g,`${g.players[loser].name} takes ${count} consolation card${count===1?'':'s'}.`);
   }
-  e.success=offenseWins;e.summary=`${g.players[winner].name} ${offenseWins?'takes the destination':'holds the destination'}. ${pacifistO||pacifistD?'The Pacifist turns surrender into victory.':oc.kind==='attack'&&dc.kind==='attack'?`${e.totals[o]} against ${e.totals[d]}${reverse?' — Anti-Matter makes the lower total win':e.totals[o]===e.totals[d]?' — defense wins ties':''}.`: 'Attack defeats Compromise.'}`;
-  record(g,e.summary);cleanup(g);for(const p of [o,d])if(hasPower(g,p,'Mutant'))draw(g,p,Math.max(0,8-g.players[p].hand.length));g.phase='resolution';checkWin(g);
+  e.success=offenseWins;e.summary=`${g.players[winner].name} ${offenseWins?'takes the destination':'holds the destination'}. ${pacifistO||pacifistD?'The Pacifist invokes Peace and turns surrender into victory.':oc.kind==='attack'&&dc.kind==='attack'?`${e.totals[o]} against ${e.totals[d]}${reverse?' — Anti-Matter makes the lower total win':e.totals[o]===e.totals[d]?' — defense wins ties':''}.`: 'Attack defeats Compromise.'}`;
+  record(g,e.summary);cleanup(g);for(const p of [o,d])if(hasPower(g,p,'Mutant')){const n=Math.max(0,8-g.players[p].hand.length);draw(g,p,n);if(n)record(g,`${g.players[p].name} invokes Regeneration and draws ${n} card${n===1?'':'s'}.`);}g.phase='resolution';checkWin(g);
 }
 function dealPlanets(g:Game) {
   const o=g.active,d=g.encounter.defense;

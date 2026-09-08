@@ -1,7 +1,7 @@
 'use client';
 /* oxlint-disable next/no-html-link-for-pages -- simple internal links work in the Sites runtime */
 
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowRight, BookOpen, Coins, Eye, Orbit, RotateCcw, Shield, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,6 +15,17 @@ const phases = ['Regroup','Destiny','Launch','Alliance','Planning','Reveal'];
 const alienArt: Alien[] = ['Clone','Macron','Virus','Zombie','Anti-Matter','Pacifist','Warpish','Mutant'];
 const cardArt = (kind:Card['kind']) => ({attack:[0,0],compromise:[50,0],flare:[100,0],edict:[50,100],kicker:[0,100]}[kind]);
 const phaseNumber = (g:Game) => ({regroup:0,destiny:1,launch:2,inviteO:3,inviteD:3,alliance:3,tactics:4,planning:4,reveal:5,deal:5,resolution:5,gameover:5})[g.phase];
+type Spectacle = { id:string; kind:'launch'|'warp'|'capture'|'power'|'reveal'|'reward'|'victory'; title:string; body:string };
+const spectacleFor=(body:string,id:string):Spectacle|null=>{
+  if(body.includes('invokes ')||body.includes('through Replication'))return{id,kind:'power',title:'ALIEN POWER!',body};
+  if(body.includes('into the Warp'))return{id,kind:'warp',title:'THE WARP OPENS',body};
+  if(body.includes('launches '))return{id,kind:'launch',title:'TOKENS IN FLIGHT',body};
+  if(body.includes('takes the destination')||body.startsWith('Deal accepted'))return{id,kind:'capture',title:'NEW COSMIC BASE',body};
+  if(body.includes(' reveals '))return{id,kind:'reveal',title:'THE CARDS ARE DOWN',body};
+  if(body.includes('earns ')||body.includes('consolation'))return{id,kind:'reward',title:'COSMIC REWARD',body};
+  if(body.includes('win')&&body.includes('galaxy'))return{id,kind:'victory',title:'GALACTIC VICTORY',body};
+  return null;
+};
 
 export default function Home() {
   const [game,setGame] = useState(() => newGame(defaults));
@@ -28,6 +39,8 @@ export default function Home() {
   const [error,setError] = useState('');
   const [inspected,setInspected] = useState<Card|null>(null);
   const [inspectedPower,setInspectedPower] = useState<Alien|null>(null);
+  const [spectacles,setSpectacles] = useState<Spectacle[]>([]);
+  const seenLogs = useRef(game.log.length);
   const d=decision(game), e=game.encounter, human=started&&d.player===0;
   const target=game.planets.find(x=>x.id===e.target);
 
@@ -35,7 +48,9 @@ export default function Home() {
   useEffect(()=>{try{const raw=localStorage.getItem(SAVE);if(raw){const saved=deserialize(raw);setGame(saved);setSettings(saved.settings);setStarted(true)}}catch{setError('The saved expedition could not be loaded.')}setReady(true)},[]);
   /* oxlint-enable react/react-compiler */
   useEffect(()=>{if(started&&ready)localStorage.setItem(SAVE,serialize(game))},[game,started,ready]);
-  useEffect(()=>{if(!started||paused||guide||restart||human||game.phase==='gameover')return;const timer=setTimeout(()=>{try{setGame(g=>applyAction(g,chooseBotAction(g)))}catch{setError('A computer move could not be resolved.');setPaused(true)}},480);return()=>clearTimeout(timer)},[game,started,paused,guide,restart,human]);
+  useEffect(()=>{if(!started||paused||guide||restart||human||spectacles.length||game.phase==='gameover')return;const timer=setTimeout(()=>{try{setGame(g=>applyAction(g,chooseBotAction(g)))}catch{setError('A computer move could not be resolved.');setPaused(true)}},650);return()=>clearTimeout(timer)},[game,started,paused,guide,restart,human,spectacles.length]);
+  useEffect(()=>{if(!started){seenLogs.current=game.log.length;return}if(game.log.length<seenLogs.current){seenLogs.current=game.log.length;return}const fresh=game.log.slice(seenLogs.current);seenLogs.current=game.log.length;const moments=fresh.map((x,i)=>spectacleFor(x,`${game.actionCount}-${i}-${x}`)).filter((x):x is Spectacle=>!!x);if(moments.length)setSpectacles(q=>[...q,...moments].slice(-8))},[game.log,game.actionCount,started]);
+  useEffect(()=>{if(!spectacles.length)return;const timer=setTimeout(()=>setSpectacles(q=>q.slice(1)),spectacles[0].kind==='power'?2900:2200);return()=>clearTimeout(timer)},[spectacles]);
   const act=(id:string)=>{try{setGame(g=>applyAction(g,id));setPicked('');setError('')}catch(err){setError(err instanceof Error?err.message:'That move is unavailable.')}};
   const begin=()=>{setGame(newGame(settings,crypto.getRandomValues(new Uint32Array(1))[0]));setStarted(true);setRestart(false);setPaused(false);setPicked('');setError('')};
   const option=<K extends keyof Settings>(key:K,value:Settings[K])=>setSettings(s=>({...s,[key]:value}));
@@ -52,7 +67,9 @@ export default function Home() {
   const card=(c:Card)=>{const play=human&&d.actions.find(a=>a.kind==='card'&&a.cardId===c.id);const art=cardArt(c.kind);return <button style={{'--cx':`${art[0]}%`,'--cy':`${art[1]}%`} as CSSProperties} className={`card ${c.kind} ${play?'playable':''}`} key={c.id} onClick={()=>setInspected(c)}><small>{c.kind.toUpperCase()}</small><strong>{c.kind==='attack'?c.value:c.kind==='compromise'?'C':c.kind==='kicker'?`×${c.value}`:<Sparkles/>}</strong><b>{cardLabel(c)}</b><span>{c.kind==='attack'?'Challenge card':c.kind==='compromise'?'Make a deal':c.kind==='flare'?'Alien flare':'Cosmic effect'}</span><i><Eye/> Turn over</i></button>};
   const launch=d.actions.filter(a=>a.kind==='launch'&&a.target===picked);
 
-  return <main className="cosmos">
+  const show=spectacles[0];
+  return <main className={`cosmos ${show?`show-${show.kind}`:''}`}>
+    {show&&<output className={`cosmic-event ${show.kind}`} aria-live="polite"><div className="event-motion"><span/><span/><span/><span/></div><div className="event-emblem">{show.kind==='power'?<Sparkles/>:show.kind==='warp'?<Orbit/>:show.kind==='capture'?<Shield/>:<ArrowRight/>}</div><div><b>{show.title}</b><p>{show.body}</p></div><small>{spectacles.length>1?`${spectacles.length-1} more cosmic event${spectacles.length===2?'':'s'}`:''}</small></output>}
     <header className="masthead"><div><p className="eyebrow">THE EON YEARS · 1977—1983</p><h1>COSMIC <span>ENCOUNTERS</span></h1></div><nav><span>SOLO EXPEDITION</span><a className="nav-link" href="/rules"><BookOpen/> Complete rules</a><Button variant="ghost" onClick={()=>setGuide(true)}>Quick guide</Button>{started&&<Button variant="ghost" onClick={()=>setRestart(true)}><RotateCcw/> New game</Button>}</nav></header>
     <div className="topline"><span>● {started?'EXPEDITION IN PROGRESS':'YOUR TABLE IS READY'} <i>/ Eon adaptation · playable alpha</i></span><i>{started?`Turn ${game.turn} · Challenge ${game.challenge}`:'First to five foreign bases'}</i></div>{error&&<div role="alert" className="error">{error}</div>}
     <div className="layout"><section><div className="board-title"><div><p className="eyebrow">THE GALAXY</p><h2>{started?`${game.players[game.active].name==='You'?'Your':game.players[game.active].name+'’s'} challenge`:'Make yourself at home. Everywhere.'}</h2></div><strong>5 <small>BASES<br/>TO WIN</small></strong></div>
