@@ -1,4 +1,5 @@
 node_modules/
+artwork-staging/
 dist/
 .wrangler/
 .vinext/
