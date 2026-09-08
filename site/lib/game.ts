@@ -222,7 +222,9 @@ function cleanup(g:Game) {
 function resolveCombat(g:Game) {
   const e=g.encounter,o=g.active,d=e.defense,target=g.planets.find(x=>x.id===e.target)!;
   const oc=e.selected[o]!,dc=e.selected[d]!;
-  record(g,`${g.players[o].name} reveals ${cardLabel(oc)}. ${g.players[d].name} reveals ${cardLabel(dc)}.`);
+  const revealName=(p:number)=>g.players[p].name==='You'?'You reveal':`${g.players[p].name} reveals`;
+  const revealCard=(p:number,c:Card)=>`${cardLabel(c)}${e.kickers[p]?` with Kicker ×${e.kickers[p]!.value}`:''}`;
+  record(g,`${revealName(o)} ${revealCard(o,oc)}. ${revealName(d)} ${revealCard(d,dc)}.`);
   if(oc.kind==='compromise'&&dc.kind==='compromise') {
     for(let p=0;p<4;p++)if(p!==o&&p!==d){returnShips(g,p,e.ships[p]);e.ships[p]=0;}
     g.phase='deal';return;
@@ -259,7 +261,8 @@ function resolveCombat(g:Game) {
     for(let i=0;i<count;i++){const index=Math.floor(random(g)*g.players[winner].hand.length);g.players[loser].hand.push(g.players[winner].hand.splice(index,1)[0]);}
     record(g,`${g.players[loser].name} takes ${count} consolation card${count===1?'':'s'}.`);
   }
-  e.success=offenseWins;e.summary=`${g.players[winner].name} ${offenseWins?'takes the destination':'holds the destination'}. ${pacifistO||pacifistD?'The Pacifist invokes Peace and turns surrender into victory.':oc.kind==='attack'&&dc.kind==='attack'?`${e.totals[o]} against ${e.totals[d]}${reverse?' — Anti-Matter makes the lower total win':e.totals[o]===e.totals[d]?' — defense wins ties':''}.`: 'Attack defeats Compromise.'}`;
+  const winnerName=g.players[winner].name;const resultVerb=offenseWins?(winnerName==='You'?'take':'takes'):(winnerName==='You'?'hold':'holds');
+  e.success=offenseWins;e.summary=`${winnerName} ${resultVerb} the destination. ${pacifistO||pacifistD?'The Pacifist invokes Peace and turns surrender into victory.':oc.kind==='attack'&&dc.kind==='attack'?`${e.totals[o]} against ${e.totals[d]}${reverse?' — Anti-Matter makes the lower total win':e.totals[o]===e.totals[d]?' — defense wins ties':''}.`: 'Attack defeats Compromise.'}`;
   record(g,e.summary);cleanup(g);for(const p of [o,d])if(hasPower(g,p,'Mutant')){const n=Math.max(0,8-g.players[p].hand.length);draw(g,p,n);if(n)record(g,`${g.players[p].name} invokes Regeneration and draws ${n} card${n===1?'':'s'}.`);}g.phase='resolution';checkWin(g);
 }
 function dealPlanets(g:Game) {
@@ -305,7 +308,7 @@ export function applyAction(state:Game,id:string):Game {
     case 'buy-card':g.players[p].lucre--;e.bought[p]++;draw(g,p,1);record(g,`${g.players[p].name} buys one card.`);break;
     case 'zap':consumeEdict(g,p,a.cardId!);e.zapped.push(a.player!);record(g,`${g.players[p].name} zaps ${g.players[a.player!].name}.`);break;
     case 'field':consumeEdict(g,p,a.cardId!);returnShips(g,a.player!,e.ships[a.player!]);e.ships[a.player!]=0;e.sides[a.player!]=null;record(g,`${g.players[p].name} excludes ${g.players[a.player!].name} with a Force Field.`);break;
-    case 'kicker':{const index=g.players[p].hand.findIndex(c=>c.id===a.cardId);e.kickers[p]=g.players[p].hand.splice(index,1)[0];record(g,`${g.players[p].name} commits a face-down Kicker.`);break;}
+    case 'kicker':{const index=g.players[p].hand.findIndex(c=>c.id===a.cardId);e.kickers[p]=g.players[p].hand.splice(index,1)[0];record(g,`${g.players[p].name} commits a face-down Kicker ×${e.kickers[p]!.value}.`);break;}
     case 'ready':e.cursor++;if(e.cursor>=e.order.length)startPlanning(g);break;
     case 'card':{const index=g.players[p].hand.findIndex(c=>c.id===a.cardId);e.selected[p]=g.players[p].hand.splice(index,1)[0];if(e.selected[g.active]&&e.selected[e.defense])g.phase='reveal';break;}
     case 'reveal':resolveCombat(g);break;
