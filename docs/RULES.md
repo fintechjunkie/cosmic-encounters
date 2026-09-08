@@ -12,7 +12,7 @@ The reference rules are Eon’s 1983 *Complete Book of Cosmic Encounter Rules* a
 - Attack versus Attack, defense winning ties, Compromise versus Attack with random consolation, and mutual Compromise deals
 - Offensive ally bases and defensive ally rewards
 - Alien power loss below three home bases
-- Eon versions of Clone, Macron, Virus, and Zombie
+- Eon-style versions of Clone, Macron, Virus, Zombie, Anti-Matter, Pacifist, Warpish, and Mutant
 - Optional Lucre: four at setup, one on the first challenge of a turn, token/card purchases, and Lucre added to main-player totals
 - Optional Eon-style Kickers with values 3, 2, 2, 2, and 0
 - Mobius Tubes, Cosmic Zap, and Force Field
@@ -37,4 +37,3 @@ The Praw, Reverse Cone, the remaining Edicts and Flares, the remaining 71 aliens
 
 - [Eon consolidated rules](https://daveola.com/CosmicEncounter/Rules/Eon.Rules.pdf)
 - [Eon appendix](https://daveola.com/CosmicEncounter/Rules/Eon_Appendix.pdf)
-

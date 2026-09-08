@@ -1,6 +1,6 @@
 // Eon-era rules engine. No UI, clock, network, or unseeded randomness.
 // The supported subset and deliberate adaptations are recorded in docs/RULES.md.
-export type Alien = 'Clone' | 'Macron' | 'Virus' | 'Zombie';
+export type Alien = 'Clone' | 'Macron' | 'Virus' | 'Zombie' | 'Anti-Matter' | 'Pacifist' | 'Warpish' | 'Mutant';
 export type Card = { id: string; kind: 'attack' | 'compromise' | 'edict' | 'flare' | 'kicker'; name: string; value: number };
 export type Planet = { id: string; home: number; index: number; ships: number[]; moon?: string; revealed?: boolean };
 export type Player = { id: number; name: string; alien: Alien; color: string; hand: Card[]; warp: number; lucre: number };
@@ -16,6 +16,10 @@ export const ALIENS: Record<Alien, { title: string; description: string; hint: s
   Macron: { title: 'Mass', description: 'Each token fights with a strength of four. Launch only one token without your Super Flare.', hint: 'Small fleets. Enormous consequences.' },
   Virus: { title: 'Multiplication', description: 'Multiply your attack card by the number of tokens on your side, including allies.', hint: 'In the Eon version, your allies multiply too.' },
   Zombie: { title: 'Immortality', description: 'Your lost tokens return to your bases instead of entering the Warp.', hint: 'Take risks. You tend to come back.' },
+  'Anti-Matter': { title: 'Negation', description: 'When you are a main player and both sides attack, the lower total wins. Defense still wins ties.', hint: 'Small cards become terrifying. Keep your total lean.' },
+  Pacifist: { title: 'Peace', description: 'As a main player, your Compromise defeats an opponent’s Attack.', hint: 'Your opponent must decide whether your surrender is a trap.' },
+  Warpish: { title: 'Necromancy', description: 'As a main player, add the number of your tokens in the Warp to your combat total.', hint: 'A crowded Warp can turn a modest attack into a victory.' },
+  Mutant: { title: 'Regeneration', description: 'After an encounter in which you are a main player, refill your hand to eight cards.', hint: 'Spend cards freely. Your hand keeps growing back.' },
 };
 export const MOONS: Record<string, { name: string; description: string }> = {
   mass: { name: 'Mass Generation', description: 'Your attack cards gain 10 while you occupy this moon.' },
@@ -202,6 +206,7 @@ export function combatTotal(g:Game,p:number,card:Card) {
   let total=hasPower(g,p,'Virus') ? attack*(own+allies.reduce((n,x)=>n+e.ships[x.id],0)) : attack+tokenValue(g,p,own)+allyStrength;
   if(moonEffect(g,p,'plus'))total+=10;if(moonEffect(g,p,'minus'))total-=10;
   if(!offense)total+=g.planets.filter(x=>x.moon==='defense'&&x.revealed).reduce((n,x)=>n+tokenValue(g,p,x.ships[p]),0);
+  if(hasPower(g,p,'Warpish'))total+=g.players[p].warp;
   return total+g.players[p].lucre;
 }
 function checkWin(g:Game) {g.winners=g.players.filter(p=>foreignBases(g,p.id)>=5).map(p=>p.id);if(g.winners.length){g.phase='gameover';record(g,`${g.winners.map(p=>g.players[p].name).join(' and ')} win${g.winners.length===1?'s':''} the galaxy!`);}}
@@ -221,7 +226,10 @@ function resolveCombat(g:Game) {
     g.phase='deal';return;
   }
   e.totals[o]=oc.kind==='attack'?combatTotal(g,o,oc):0;e.totals[d]=dc.kind==='attack'?combatTotal(g,d,dc):0;
-  const offenseWins=oc.kind==='attack'&&(dc.kind==='compromise'||e.totals[o]>e.totals[d]);
+  const pacifistO=oc.kind==='compromise'&&dc.kind==='attack'&&hasPower(g,o,'Pacifist');
+  const pacifistD=dc.kind==='compromise'&&oc.kind==='attack'&&hasPower(g,d,'Pacifist');
+  const reverse=hasPower(g,o,'Anti-Matter')||hasPower(g,d,'Anti-Matter');
+  const offenseWins=pacifistO?true:pacifistD?false:oc.kind==='attack'&&(dc.kind==='compromise'||(reverse?e.totals[o]<e.totals[d]:e.totals[o]>e.totals[d]));
   // Snapshot power status before losing home bases, since losses are simultaneous.
   const immortal=g.players.map(p=>hasPower(g,p.id,'Zombie'));
   const loser=offenseWins?d:o,winner=offenseWins?o:d;
@@ -242,8 +250,8 @@ function resolveCombat(g:Game) {
     for(let i=0;i<count;i++){const index=Math.floor(random(g)*g.players[winner].hand.length);g.players[loser].hand.push(g.players[winner].hand.splice(index,1)[0]);}
     record(g,`${g.players[loser].name} takes ${count} consolation card${count===1?'':'s'}.`);
   }
-  e.success=offenseWins;e.summary=`${g.players[winner].name} ${offenseWins?'takes the destination':'holds the destination'}. ${oc.kind==='attack'&&dc.kind==='attack'?`${e.totals[o]} against ${e.totals[d]}${e.totals[o]===e.totals[d]?' — defense wins ties':''}.`: 'Attack defeats Compromise.'}`;
-  record(g,e.summary);cleanup(g);g.phase='resolution';checkWin(g);
+  e.success=offenseWins;e.summary=`${g.players[winner].name} ${offenseWins?'takes the destination':'holds the destination'}. ${pacifistO||pacifistD?'The Pacifist turns surrender into victory.':oc.kind==='attack'&&dc.kind==='attack'?`${e.totals[o]} against ${e.totals[d]}${reverse?' — Anti-Matter makes the lower total win':e.totals[o]===e.totals[d]?' — defense wins ties':''}.`: 'Attack defeats Compromise.'}`;
+  record(g,e.summary);cleanup(g);for(const p of [o,d])if(hasPower(g,p,'Mutant'))draw(g,p,Math.max(0,8-g.players[p].hand.length));g.phase='resolution';checkWin(g);
 }
 function dealPlanets(g:Game) {
   const o=g.active,d=g.encounter.defense;
