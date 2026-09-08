@@ -45,7 +45,7 @@ export default function Home() {
   const target=game.planets.find(x=>x.id===e.target);
 
   /* oxlint-disable react/react-compiler -- one-time hydration from device storage */
-  useEffect(()=>{try{const raw=localStorage.getItem(SAVE);if(raw){const saved=deserialize(raw);setGame(saved);setSettings(saved.settings);setStarted(true)}}catch{setError('The saved expedition could not be loaded.')}setReady(true)},[]);
+  useEffect(()=>{try{const raw=localStorage.getItem(SAVE);if(raw){const saved=deserialize(raw);setGame(saved);setSettings(saved.settings);setStarted(true)}}catch{localStorage.removeItem(SAVE);setError('An older invalid expedition was cleared. Begin a new four-player game.')}setReady(true)},[]);
   /* oxlint-enable react/react-compiler */
   useEffect(()=>{if(started&&ready)localStorage.setItem(SAVE,serialize(game))},[game,started,ready]);
   useEffect(()=>{if(!started||paused||guide||restart||human||spectacles.length||game.phase==='gameover')return;const timer=setTimeout(()=>{try{setGame(g=>applyAction(g,chooseBotAction(g)))}catch{setError('A computer move could not be resolved.');setPaused(true)}},650);return()=>clearTimeout(timer)},[game,started,paused,guide,restart,human,spectacles.length]);

@@ -103,8 +103,10 @@ function begin(g:Game,first:boolean) {
 }
 export function newGame(settings:Partial<Settings>={},seed=1977):Game {
   const config:Settings={alien:'Clone',flares:true,moons:true,lucre:true,kickers:true,difficulty:'standard',...settings};
-  const roster:Alien[]=[config.alien,...(Object.keys(ALIENS) as Alien[]).filter(a=>a!==config.alien)];
-  const g:Game={version:1,seed:seed>>>0,rng:seed>>>0,settings:config,players:roster.map((alien,id)=>({id,name:id===0?'You':alien,alien,color:['#efad59','#79c4b4','#ae9bdb','#e47f74'][id],hand:[],warp:0,lucre:config.lucre?4:0})),planets:[],deck:[],discard:[],destiny:[],destinyDiscard:[],active:0,turn:1,challenge:1,phase:'regroup',encounter:emptyEncounter(),log:[],winners:[],actionCount:0,cardCount:0};
+  let rosterRng=seed>>>0;const candidates=(Object.keys(ALIENS) as Alien[]).filter(a=>a!==config.alien);
+  for(let i=candidates.length-1;i>0;i--){rosterRng=(Math.imul(rosterRng,1664525)+1013904223)>>>0;const j=Math.floor((rosterRng/4294967296)*(i+1));[candidates[i],candidates[j]]=[candidates[j],candidates[i]];}
+  const roster:Alien[]=[config.alien,...candidates.slice(0,3)];
+  const g:Game={version:1,seed:seed>>>0,rng:rosterRng,settings:config,players:roster.map((alien,id)=>({id,name:id===0?'You':alien,alien,color:['#efad59','#79c4b4','#ae9bdb','#e47f74'][id],hand:[],warp:0,lucre:config.lucre?4:0})),planets:[],deck:[],discard:[],destiny:[],destinyDiscard:[],active:0,turn:1,challenge:1,phase:'regroup',encounter:emptyEncounter(),log:[],winners:[],actionCount:0,cardCount:0};
   for(let p=0;p<4;p++)for(let i=0;i<5;i++)g.planets.push({id:`p${p}-${i}`,home:p,index:i,ships:[0,1,2,3].map(x=>x===p?4:0)});
   if(config.moons) { const pool=shuffle(g,Object.keys(MOONS)); for(let p=0;p<4;p++)for(let i=0;i<2;i++)g.planets.push({id:`m${p}-${i}`,home:p,index:i,ships:[0,0,0,0],moon:pool.pop()!,revealed:false}); }
   let id=0; const add=(kind:Card['kind'],name:string,value:number,count=1)=>{for(let i=0;i<count;i++)g.deck.push({id:`c${id++}`,kind,name,value});};
