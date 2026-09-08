@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+.vinext/
+.next/
+*.tsbuildinfo
+*.log
+.env*
+!.env.example
+outputs/
+*.tar.gz
+
